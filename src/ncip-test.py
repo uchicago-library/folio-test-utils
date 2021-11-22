@@ -198,7 +198,8 @@ def check_accept_item(response):
 
 def check_ncip_response(response):
     global fail
-    
+
+    ns = {'ncip': 'http://www.niso.org/2008/ncip'}
     response_body = response.read().decode("utf-8")
 
     if response.getcode() != 200:
@@ -209,13 +210,19 @@ def check_ncip_response(response):
     
     ncip_message = ET.fromstring(response_body)
     logging.debug("Msg:" + repr(ncip_message))
-    problem = ncip_message.find('.//ncip:Problem',
-                                namespaces = {'ncip': 'http://www.niso.org/2008/ncip'})
-    #print("Prob:" + repr(problem)) 
+    problem = ncip_message.find('.//ncip:Problem', namespaces = ns)
+    #print("Prob:" + repr(problem))
+
     if problem != None:
+        problem_type = problem.find('.//ncip:ProblemType', namespaces = ns)
+        problem_detail = problem.find('.//ncip:ProblemDetail', namespaces = ns)
         print("Failure!:")
-        for e in problem:
-            print('\t' + e.tag + '=' + str(e.text))
+        print('ProblemType = ' + problem_type.text)
+        print('ProblemDetail = ' + problem_detail.text)
+        logging.warning('ProblemType = ' + problem_type.text + '; '
+                        + 'ProblemDetail = ' + problem_detail.text)
+        #for e in problem:
+        #    print('\t' + e.tag + '=' + str(e.text))
     else:
         print("Success!")
         
