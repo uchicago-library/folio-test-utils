@@ -5,6 +5,7 @@
 """
 
 import argparse
+import logging
 import os
 import string
 import sys
@@ -77,8 +78,7 @@ def accept_item_request(svc, ncip_agency, ncip_item):
                                         ncip_item.patron_barcode,
                                         ncip_item.author, ncip_item.title,
                                         ncip_item.callnumber)
-    if args.verbose:
-        print(accept_msg)
+    logging.debug(accept_msg)
     return urllib.request.Request(svc, method="POST",
                                   headers = {'Content-Type': 'application/xml'},
                                   data=accept_msg.encode(encoding="utf-8"))
@@ -112,8 +112,7 @@ def checkout_item_request(svc, ncip_agency, ncip_item):
     checkout_msg = checkout_template.format(ncip_agency,
                                             ncip_item.patron_barcode,
                                             ncip_item.item_barcode)
-    if args.verbose:
-        print(checkout_msg)
+    logging.debug(checkout_msg)
     return urllib.request.Request(svc, method="POST",
                                   headers = {'Content-Type': 'application/xml'},
                                   data=checkout_msg.encode(encoding="utf-8"))
@@ -142,9 +141,9 @@ version="http://www.niso.org/schemas/ncip/v2_0/ncip_v2_0.xsd">
    <ItemElementType>Item Description</ItemElementType>
  </CheckInItem>
 </NCIPMessage>"""
+
     checkin_msg = checkin_template.format(ncip_agency, ncip_item.item_barcode)
-    if args.verbose:
-        print(checkin_msg)
+    logging.debug(checkin_msg)
     return urllib.request.Request(svc, method="POST",
                                   headers = {'Content-Type': 'application/xml'},
                                   data=checkin_msg.encode(encoding="utf-8"))
@@ -190,11 +189,12 @@ _fail_msg = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 """
 def check_accept_item(response):
     if response.getcode() != 200:
-        print("response code: " + str(response.getcode()))
+        print("Server error: HTTP " + str(response.getcode()))
+        logging.warning("Server error: HTTP : " + str(response.getcode()))
         #for h in response.getheaders():
         #    print(h)
         response_body = response.read().decode("utf-8")
-        print("response body: " + response_body)
+        logging.warning("response body: " + response_body)
 
 def check_ncip_response(response):
     global fail
@@ -203,12 +203,12 @@ def check_ncip_response(response):
 
     if response.getcode() != 200:
         print("Server error: HTTP " + str(response.getcode()))
-        print("response body: " + response_body)
+        logging.warning("Server error: HTTP : " + str(response.getcode()))
+        logging.warning("response body: " + response_body)
         return
     
     ncip_message = ET.fromstring(response_body)
-    #ncip_message = ET.fromstring(fail)
-    # print("Msg:" + repr(ncip_message))
+    logging.debug("Msg:" + repr(ncip_message))
     problem = ncip_message.find('.//ncip:Problem',
                                 namespaces = {'ncip': 'http://www.niso.org/2008/ncip'})
     #print("Prob:" + repr(problem)) 
@@ -246,6 +246,8 @@ def main(arguments):
     args = parse_arguments(arguments)
     print(args)
 
+    logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', filename='ncip-test.log', level=logging.INFO)
+
     # build item list
     item_list = []
     for i in range(args.number_items):
@@ -261,10 +263,11 @@ def main(arguments):
     # run AcceptItem for all items in list
     for ncip_item in item_list:
         print("Accept: " + str(ncip_item))
+        logging.info("Accept: " + str(ncip_item))
         #response = accept_item(args.ncip_service, item)
         request = accept_item_request(args.ncip_service, args.ncip_agency, ncip_item)
         response, response_time = make_request(request)
-        print('AcceptItem time for barcode {0}: {1:.2f}'.format(ncip_item.item_barcode, response_time))
+        logging.info('AcceptItem time for barcode {0}: {1:.2f}'.format(ncip_item.item_barcode, response_time))
         check_ncip_response(response)
         time.sleep(2)
         
@@ -276,17 +279,17 @@ def main(arguments):
             print("Checkout: " + ncip_item.item_barcode)
             request = checkout_item_request(args.ncip_service, args.ncip_agency, ncip_item)
             response, response_time = make_request(request)
-            print('CheckoutItem time for barcode {0}: {1:.2f}'.format(ncip_item.item_barcode, response_time))
+            logging.info('CheckoutItem time for barcode {0}: {1:.2f}'.format(ncip_item.item_barcode, response_time))
             check_ncip_response(response)
             time.sleep(2)
         print("Sleeping...")
         time.sleep(5)
         # call CheckinItem on each item
         for item in item_list:
-            print("Checking: " + item.item_barcode)
+            print("Checkin: " + item.item_barcode)
             request = checkin_item_request(args.ncip_service, args.ncip_agency, ncip_item)
             response, response_time = make_request(request)
-            print('CheckinItem time for barcode {0}: {1:.2f}'.format(ncip_item.item_barcode, response_time))
+            logging.info('CheckinItem time for barcode {0}: {1:.2f}'.format(ncip_item.item_barcode, response_time))
             check_ncip_response(response)
             time.sleep(2)
 
